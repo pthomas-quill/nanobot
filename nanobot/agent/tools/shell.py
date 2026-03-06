@@ -20,6 +20,7 @@ class ExecTool(Tool):
         allow_patterns: list[str] | None = None,
         restrict_to_workspace: bool = False,
         path_append: str = "",
+        strip_env_vars: list[str] | None = None,
     ):
         self.timeout = timeout
         self.working_dir = working_dir
@@ -37,6 +38,7 @@ class ExecTool(Tool):
         self.allow_patterns = allow_patterns or []
         self.restrict_to_workspace = restrict_to_workspace
         self.path_append = path_append
+        self.strip_env_vars = strip_env_vars or []
 
     @property
     def name(self) -> str:
@@ -72,6 +74,8 @@ class ExecTool(Tool):
         env = os.environ.copy()
         if self.path_append:
             env["PATH"] = env.get("PATH", "") + os.pathsep + self.path_append
+        for var in self.strip_env_vars:
+            env.pop(var, None)
 
         try:
             process = await asyncio.create_subprocess_shell(

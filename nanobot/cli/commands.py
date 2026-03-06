@@ -183,7 +183,7 @@ def onboard():
             save_config(config)
             console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
         else:
-            config = load_config()
+            config = load_config(interpolate_env_vars=False) # Load without interpolation to preserve literal env var references
             save_config(config)
             console.print(f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)")
     else:

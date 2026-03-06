@@ -17,7 +17,7 @@ def get_data_dir() -> Path:
     return get_data_path()
 
 
-def load_config(config_path: Path | None = None) -> Config:
+def load_config(config_path: Path | None = None, interpolate_env_vars: bool = True) -> Config:
     """
     Load configuration from file or create default.
 
@@ -32,8 +32,10 @@ def load_config(config_path: Path | None = None) -> Config:
     if path.exists():
         try:
             with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-            data = _migrate_config(data)
+                config_str = f.read()
+            if interpolate_env_vars:
+                config_str =  _interpolate_env_vars(config_str)
+            data = _migrate_config(json.loads(config_str))
             return Config.model_validate(data)
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Warning: Failed to load config from {path}: {e}")
@@ -67,3 +69,15 @@ def _migrate_config(data: dict) -> dict:
     if "restrictToWorkspace" in exec_cfg and "restrictToWorkspace" not in tools:
         tools["restrictToWorkspace"] = exec_cfg.pop("restrictToWorkspace")
     return data
+
+def _interpolate_env_vars(value: str) -> str:
+    """Interpolate environment variables in a string."""
+    import re
+    import os
+    pattern = re.compile(r"\$\{([^}]+)\}")
+    
+    def replacer(match):
+        var_name = match.group(1)
+        return os.environ.get(var_name, "")
+    
+    return pattern.sub(replacer, value)    

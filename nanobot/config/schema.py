@@ -305,6 +305,7 @@ class ExecToolConfig(Base):
 
     timeout: int = 60
     path_append: str = ""
+    strip_env_vars: list[str] = Field(default_factory=list)  # List of env var names to remove from the execution environment (e.g. ["OPENAI_API_KEY", "HUGGINGFACEHUB_API_TOKEN"])
 
 
 class MCPServerConfig(Base):
