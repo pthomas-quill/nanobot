@@ -93,10 +93,10 @@ class TelegramChannel(BaseChannel):
 
     # Commands registered with Telegram's command menu
     BOT_COMMANDS = [
-        BotCommand("start", "Start the bot"),
         BotCommand("new", "Start a new conversation"),
         BotCommand("stop", "Stop the current task"),
         BotCommand("help", "Show available commands"),
+        BotCommand("think", "Get or set reasoning effort level"),
     ]
 
     def __init__(
@@ -132,8 +132,8 @@ class TelegramChannel(BaseChannel):
 
         # Add command handlers
         self._app.add_handler(CommandHandler("start", self._on_start))
-        self._app.add_handler(CommandHandler("new", self._forward_command))
-        self._app.add_handler(CommandHandler("help", self._on_help))
+        for cmd in self.BOT_COMMANDS:
+            self._app.add_handler(CommandHandler(cmd.command, self._forward_command))
 
         # Add message handler for text, photos, voice, documents
         self._app.add_handler(
@@ -304,16 +304,6 @@ class TelegramChannel(BaseChannel):
             "Type /help to see available commands."
         )
 
-    async def _on_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /help command, bypassing ACL so all users can access it."""
-        if not update.message:
-            return
-        await update.message.reply_text(
-            "🐈 nanobot commands:\n"
-            "/new — Start a new conversation\n"
-            "/stop — Stop the current task\n"
-            "/help — Show available commands"
-        )
 
     @staticmethod
     def _sender_id(user) -> str:

@@ -400,8 +400,30 @@ class AgentLoop:
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content="New session started.")
         if cmd == "/help":
+            AVAILABLE_COMMANDS = {
+                "/new": "Start a new conversation",
+                "/stop": "Stop the current task",
+                "/help": "Show available commands",
+                "/think": "Get or set reasoning effort level",
+            }
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanobot commands:\n/new — Start a new conversation\n/stop — Stop the current task\n/help — Show available commands")
+                                  content="Available commands:\n" + "\n".join(f"{cmd} — {desc}" for cmd, desc in AVAILABLE_COMMANDS.items()))
+        
+        if cmd.startswith("/think"):
+            THINKING_LEVELS = "default", "minimal", "low", "medium", "high"
+            parts = cmd.split(maxsplit=1)
+            if len(parts) == 1:
+                current = self.reasoning_effort or "default"
+                return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                      content=f"Current reasoning effort level: {current}\nUsage: /think [{'|'.join(THINKING_LEVELS)}]")
+            level = parts[1].strip().lower()
+            if level not in THINKING_LEVELS:
+                return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                      content=f"Invalid reasoning effort level. Valid options are: {', '.join(THINKING_LEVELS)}")
+            self.reasoning_effort = None if level == "default" else level
+            self.subagents.reasoning_effort = self.reasoning_effort
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content=f"Reasoning effort level set to: {level}")
 
         unconsolidated = len(session.messages) - session.last_consolidated
         if (unconsolidated >= self.memory_window and session.key not in self._consolidating):
