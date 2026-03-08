@@ -287,8 +287,8 @@ class GatewayConfig(Base):
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
-    api_key: str = ""  # Brave Search API key
     max_results: int = 5
+    region: str | None = "wt-wt"  # Default region for web search (e.g. en-us, fr-fr)
 
 
 class WebToolsConfig(Base):

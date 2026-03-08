@@ -6,6 +6,7 @@ import os
 import re
 from typing import Any
 from urllib.parse import urlparse
+from ddgs import DDGS
 
 import httpx
 from loguru import logger
@@ -53,54 +54,45 @@ class WebSearchTool(Tool):
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "Search query"},
-            "count": {"type": "integer", "description": "Results (1-10)", "minimum": 1, "maximum": 10}
+            "count": {"type": "integer", "description": "Results (1-10)", "minimum": 1, "maximum": 10},
+            "region": {"type": "string", "description": "Search region (e.g. en-us, fr-fr)"},
         },
         "required": ["query"]
     }
 
-    def __init__(self, api_key: str | None = None, max_results: int = 5, proxy: str | None = None):
-        self._init_api_key = api_key
+    def __init__(self, max_results: int = 5, region: str = "wt-wt"):
         self.max_results = max_results
-        self.proxy = proxy
+        self.engine = DDGS()
+        self.region = region.lower()  
+        if not self.validate_region(self.region):
+            raise ValueError(f"Invalid default region format: '{self.region}'. Expected format is 'en-us', 'fr-fr', etc.")
+    
+    def validate_region(self, region: str) -> bool:
+        """Validate region code format (e.g. en-us)."""
+        return bool(re.match(r'^[a-z]{2}-[a-z]{2}$', region, re.I))
 
-    @property
-    def api_key(self) -> str:
-        """Resolve API key at call time so env/config changes are picked up."""
-        return self._init_api_key or os.environ.get("BRAVE_API_KEY", "")
-
-    async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
-        if not self.api_key:
-            return (
-                "Error: Brave Search API key not configured. Set it in "
-                "~/.nanobot/config.json under tools.web.search.apiKey "
-                "(or export BRAVE_API_KEY), then restart the gateway."
-            )
-
+    async def execute(self, query: str, count: int | None = None, region: str | None = None, **kwargs: Any) -> str:
         try:
             n = min(max(count or self.max_results, 1), 10)
-            logger.debug("WebSearch: {}", "proxy enabled" if self.proxy else "direct connection")
-            async with httpx.AsyncClient(proxy=self.proxy) as client:
-                r = await client.get(
-                    "https://api.search.brave.com/res/v1/web/search",
-                    params={"q": query, "count": n},
-                    headers={"Accept": "application/json", "X-Subscription-Token": self.api_key},
-                    timeout=10.0
-                )
-                r.raise_for_status()
+            if region:
+                region = region.lower()
+                if not self.validate_region(region):
+                    return f"Invalid region format: '{region}'. Expected format is 'en-us', 'fr-fr', etc."
+            else:
+                region = self.region
+            logger.debug(f"WebSearch: region={region}, count={n}")
+            
+            results = self.engine.text(query, max_results=n, region=region)
 
-            results = r.json().get("web", {}).get("results", [])[:n]
             if not results:
                 return f"No results for: {query}"
 
             lines = [f"Results for: {query}\n"]
             for i, item in enumerate(results, 1):
-                lines.append(f"{i}. {item.get('title', '')}\n   {item.get('url', '')}")
-                if desc := item.get("description"):
+                lines.append(f"{i}. {item.get('title', '')}\n   {item.get('href', '')}")
+                if desc := item.get("body"):
                     lines.append(f"   {desc}")
             return "\n".join(lines)
-        except httpx.ProxyError as e:
-            logger.error("WebSearch proxy error: {}", e)
-            return f"Proxy error: {e}"
         except Exception as e:
             logger.error("WebSearch error: {}", e)
             return f"Error: {e}"
