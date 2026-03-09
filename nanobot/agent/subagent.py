@@ -12,6 +12,7 @@ from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTo
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
+from nanobot.agent.tools.read_skill import ReadSkillTool
 from nanobot.bus.events import InboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.config.schema import ExecToolConfig
@@ -108,6 +109,7 @@ class SubagentManager:
             ))
             tools.register(WebSearchTool(region=self.web_search_region))
             tools.register(WebFetchTool(proxy=self.web_proxy))
+            tools.register(ReadSkillTool(workspace=self.workspace))
             
             system_prompt = self._build_subagent_prompt()
             messages: list[dict[str, Any]] = [
