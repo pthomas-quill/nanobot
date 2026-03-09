@@ -355,10 +355,7 @@ class TelegramChannel(BaseChannel):
 
             for chunk in split_message(msg.content, TELEGRAM_MAX_MESSAGE_LEN):
                 # Final response: simulate streaming via draft, then persist
-                if not is_progress:
-                    await self._send_with_streaming(chat_id, chunk, reply_params, thread_kwargs)
-                else:
-                    await self._send_text(chat_id, chunk, reply_params, thread_kwargs)
+                await self._send_text(chat_id, chunk, reply_params, thread_kwargs, is_progress=is_progress)
 
     async def _send_text(
         self,
@@ -366,9 +363,12 @@ class TelegramChannel(BaseChannel):
         text: str,
         reply_params=None,
         thread_kwargs: dict | None = None,
+        is_progress: bool = False,
     ) -> None:
         """Send a plain text message with HTML fallback."""
         try:
+            if is_progress:
+                text = f"🤔 _{text}_"
             html = _markdown_to_telegram_html(text)
             await self._app.bot.send_message(
                 chat_id=chat_id, text=html, parse_mode="HTML",
@@ -386,30 +386,6 @@ class TelegramChannel(BaseChannel):
                 )
             except Exception as e2:
                 logger.error("Error sending Telegram message: {}", e2)
-
-    async def _send_with_streaming(
-        self,
-        chat_id: int,
-        text: str,
-        reply_params=None,
-        thread_kwargs: dict | None = None,
-    ) -> None:
-        """Simulate streaming via send_message_draft, then persist with send_message."""
-        draft_id = int(time.time() * 1000) % (2**31)
-        try:
-            step = max(len(text) // 8, 40)
-            for i in range(step, len(text), step):
-                await self._app.bot.send_message_draft(
-                    chat_id=chat_id, draft_id=draft_id, text=text[:i],
-                )
-                await asyncio.sleep(0.04)
-            await self._app.bot.send_message_draft(
-                chat_id=chat_id, draft_id=draft_id, text=text,
-            )
-            await asyncio.sleep(0.15)
-        except Exception:
-            pass
-        await self._send_text(chat_id, text, reply_params, thread_kwargs)
 
     async def _on_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
