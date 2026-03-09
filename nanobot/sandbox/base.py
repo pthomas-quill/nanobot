@@ -16,15 +16,11 @@ class Sandbox(ABC):
 
     def __init__(self, 
         timeout: int = 60,
-        working_dir: str | None = None,
         deny_patterns: list[str] | None = None,
         allow_patterns: list[str] | None = None,
-        restrict_to_workspace: bool = False,
-        path_append: str = "",
-        strip_env_vars: list[str] | None = None,             
+        **kwargs,
     ):
         self.timeout = timeout
-        self.working_dir = working_dir
         self.deny_patterns = deny_patterns or [
             r"\brm\s+-[rf]{1,2}\b",          # rm -r, rm -rf, rm -fr
             r"\bdel\s+/[fq]\b",              # del /f, del /q
@@ -37,11 +33,8 @@ class Sandbox(ABC):
             r":\(\)\s*\{.*\};\s*:",          # fork bomb
         ]
         self.allow_patterns = allow_patterns or []
-        self.restrict_to_workspace = restrict_to_workspace
-        self.path_append = path_append
-        self.strip_env_vars = strip_env_vars or []
     
-    def _guard_command(self, command: str, cwd: str) -> str | None:
+    def _guard_command(self, command: str) -> str | None:
         """Best-effort safety guard for potentially destructive commands."""
         cmd = command.strip()
         lower = cmd.lower()
@@ -54,27 +47,23 @@ class Sandbox(ABC):
             if not any(re.search(p, lower) for p in self.allow_patterns):
                 return "Error: Command blocked by safety guard (not in allowlist)"
 
-        if self.restrict_to_workspace:
-            if "..\\" in cmd or "../" in cmd:
-                return "Error: Command blocked by safety guard (path traversal detected)"
-
-            cwd_path = Path(cwd).resolve()
-
-            for raw in self._extract_absolute_paths(cmd):
-                try:
-                    p = Path(raw.strip()).resolve()
-                except Exception:
-                    continue
-                if p.is_absolute() and cwd_path not in p.parents and p != cwd_path:
-                    return "Error: Command blocked by safety guard (path outside working dir)"
-
         return None
-
+    
     @staticmethod
-    def _extract_absolute_paths(command: str) -> list[str]:
-        win_paths = re.findall(r"[A-Za-z]:\\[^\s\"'|><;]+", command)   # Windows: C:\...
-        posix_paths = re.findall(r"(?:^|[\s|>])(/[^\s\"'>]+)", command) # POSIX: /absolute only
-        return win_paths + posix_paths
+    def _resolve_path(
+        path: str, workspace: Path | None = None, allowed_dir: Path | None = None
+    ) -> Path:
+        """Resolve path against workspace (if relative) and enforce directory restriction."""
+        p = Path(path).expanduser()
+        if not p.is_absolute() and workspace:
+            p = workspace / p
+        resolved = p.resolve()
+        if allowed_dir:
+            try:
+                resolved.relative_to(allowed_dir.resolve())
+            except ValueError:
+                raise PermissionError(f"Path {path} is outside allowed directory {allowed_dir}")
+        return resolved
 
 
     @abstractmethod
@@ -90,20 +79,10 @@ class Sandbox(ABC):
         pass
 
     @abstractmethod
-    def setup(self) -> None:
-        """Initialize and setup the sandbox environment."""
-        pass
-
-    @abstractmethod
-    def teardown(self) -> None:
-        """Clean up and destroy the sandbox environment."""
-        pass
-
-    @abstractmethod
-    def is_running(self) -> bool:
-        """Check if the sandbox is currently running.
+    def is_isolated(self) -> bool:
+        """Check if the sandbox provides isolation from the host system.
         
         Returns:
-            True if sandbox is running, False otherwise
+            True if sandbox is isolated, False otherwise
         """
         pass

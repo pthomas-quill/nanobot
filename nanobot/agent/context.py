@@ -19,8 +19,10 @@ class ContextBuilder:
     BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, sandbox_image: str | None = None):
         self.workspace = workspace
+        self.sandbox_image = sandbox_image
+        self.sandboxed = sandbox_image is not None
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(workspace)
 
@@ -56,21 +58,30 @@ Skills with available="false" need dependencies installed first - you can try in
     def _get_identity(self) -> str:
         """Get the core identity section."""
         workspace_path = str(self.workspace.expanduser().resolve())
-        system = platform.system()
-        runtime = f"{'macOS' if system == 'Darwin' else system} {platform.machine()}, Python {platform.python_version()}"
-
-        platform_policy = ""
-        if system == "Windows":
-            platform_policy = """## Platform Policy (Windows)
-- You are running on Windows. Do not assume GNU tools like `grep`, `sed`, or `awk` exist.
-- Prefer Windows-native commands or file tools when they are more reliable.
-- If terminal output is garbled, retry with UTF-8 output enabled.
-"""
-        else:
-            platform_policy = """## Platform Policy (POSIX)
-- You are running on a POSIX system. Prefer UTF-8 and standard shell tools.
+        if self.sandboxed:
+            runtime = f"Container image: {self.sandbox_image}"
+            platform_policy = """## Platform Policy (POSIX Container)
+- You are running on a POSIX-like container. Prefer UTF-8 and standard shell tools.
 - Use file tools when they are simpler or more reliable than shell commands.
+- Only files in the workspace are persistant. Treat the container as ephemeral and isolated from the host system.
 """
+        
+        else:
+            system = platform.system()
+            runtime = f"{'macOS' if system == 'Darwin' else system} {platform.machine()}, Python {platform.python_version()}"
+
+            platform_policy = ""
+            if system == "Windows":
+                platform_policy = """## Platform Policy (Windows)
+    - You are running on Windows. Do not assume GNU tools like `grep`, `sed`, or `awk` exist.
+    - Prefer Windows-native commands or file tools when they are more reliable.
+    - If terminal output is garbled, retry with UTF-8 output enabled.
+    """
+            else:
+                platform_policy = """## Platform Policy (POSIX)
+    - You are running on a POSIX system. Prefer UTF-8 and standard shell tools.
+    - Use file tools when they are simpler or more reliable than shell commands.
+    """
 
         return f"""# nanobot 🐈
 

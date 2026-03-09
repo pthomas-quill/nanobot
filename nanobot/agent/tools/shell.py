@@ -7,32 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
-from nanobot.sandbox.hostbox import HostBox
+from nanobot.sandbox.base import Sandbox, ShellResult
 
 
 class ExecTool(Tool):
     """Tool to execute shell commands."""
 
-    def __init__(
-        self,
-        timeout: int = 60,
-        working_dir: str | None = None,
-        deny_patterns: list[str] | None = None,
-        allow_patterns: list[str] | None = None,
-        restrict_to_workspace: bool = False,
-        path_append: str = "",
-        strip_env_vars: list[str] | None = None,
-    ):
-        self.sandbox = HostBox(
-            timeout=timeout,
-            working_dir=working_dir,
-            deny_patterns=deny_patterns,
-            allow_patterns=allow_patterns,
-            restrict_to_workspace=restrict_to_workspace,
-            path_append=path_append,
-            strip_env_vars=strip_env_vars,
-        )
-        self.sandbox.setup()
+    def __init__(self, sandbox: Sandbox):
+        self.sandbox = sandbox
 
     @property
     def name(self) -> str:
@@ -61,7 +43,7 @@ class ExecTool(Tool):
     
     async def execute(self, command: str, working_dir: str | None = None, **kwargs: Any) -> str:
         try:
-            result = await self.sandbox.execute(command, working_dir)
+            result: ShellResult = await self.sandbox.execute(command, working_dir)
 
             stdout = result.stdout.strip()
             stderr = result.stderr.strip()

@@ -4,14 +4,17 @@ from typing import Any, Awaitable, Callable
 
 from nanobot.agent.tools.base import Tool
 from nanobot.bus.events import OutboundMessage
-
+from pathlib import Path
+from nanobot.agent.tools.filesystem import _resolve_path
 
 class MessageTool(Tool):
     """Tool to send messages to users on chat channels."""
 
     def __init__(
         self,
+        workspace: Path,
         send_callback: Callable[[OutboundMessage], Awaitable[None]] | None = None,
+        allowed_dir: Path | None = None,
         default_channel: str = "",
         default_chat_id: str = "",
         default_message_id: str | None = None,
@@ -21,6 +24,9 @@ class MessageTool(Tool):
         self._default_chat_id = default_chat_id
         self._default_message_id = default_message_id
         self._sent_in_turn: bool = False
+        self.workspace = workspace
+        self.allowed_dir = allowed_dir
+
 
     def set_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Set the current message context."""
@@ -70,6 +76,25 @@ class MessageTool(Tool):
             "required": ["content"]
         }
 
+    def validate_media_paths(self, media_paths: list[str]) -> list[str]:
+        """Validate media paths and return list of valid paths."""
+        errors = []
+        valid_paths = []
+        for path in media_paths:
+            try:
+                p = _resolve_path(path, self.workspace, self.allowed_dir)
+            except PermissionError as e:
+                errors.append(f"Media file outside workspace: {path}")
+                continue
+            except Exception as e:
+                errors.append(f"Invalid media path {path}: {str(e)}")
+                continue
+            if not p.exists() or not p.is_file():
+                errors.append(f"Media file not found: {path}")
+                continue
+            valid_paths.append(str(p.absolute()))
+        return valid_paths,errors
+
     async def execute(
         self,
         content: str,
@@ -88,6 +113,11 @@ class MessageTool(Tool):
 
         if not self._send_callback:
             return "Error: Message sending not configured"
+    
+        if media:
+            media, errors = self.validate_media_paths(media)
+            if errors:
+                return "Error validating media paths:\n" + "\n  ".join(errors)
 
         msg = OutboundMessage(
             channel=channel,

@@ -303,10 +303,11 @@ class WebToolsConfig(Base):
 
 class ExecToolConfig(Base):
     """Shell exec tool configuration."""
-
+    sandbox_type: str = "host"  # "host", "docker", or "podman"
     timeout: int = 60
     path_append: str = ""
-    strip_env_vars: list[str] = Field(default_factory=list)  # List of env var names to remove from the execution environment (e.g. ["OPENAI_API_KEY", "HUGGINGFACEHUB_API_TOKEN"])
+    strip_env_vars: list[str] = Field(default_factory=list) 
+    sandbox_image: str = "python:3.13-slim"
 
 
 class MCPServerConfig(Base):

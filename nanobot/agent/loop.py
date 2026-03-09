@@ -20,6 +20,7 @@ from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTo
 from nanobot.agent.tools.read_skill import ReadSkillTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.sandbox import HostBox, ContainerBox
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.spawn import SpawnTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
@@ -82,22 +83,40 @@ class AgentLoop:
         self.web_proxy = web_proxy
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
-        self.restrict_to_workspace = restrict_to_workspace
 
-        self.context = ContextBuilder(workspace)
+        sandbox_type = self.exec_config.sandbox_type.lower()
+        if sandbox_type == "host":
+            self.restrict_to_workspace = restrict_to_workspace
+            self.sandbox = HostBox(
+                workspace=self.workspace,
+                restrict_to_workspace=self.restrict_to_workspace,
+                path_append=self.exec_config.path_append,
+                strip_env_vars=self.exec_config.strip_env_vars,
+            )
+            self.sandbox_image = None
+        elif sandbox_type in ("docker", "podman"):
+            self.sandbox = ContainerBox(
+                workspace=self.workspace,
+                image=self.exec_config.sandbox_image,
+                backend=sandbox_type,
+            )
+            self.restrict_to_workspace = True  # Container is always restricted to workspace
+            self.sandbox_image = self.exec_config.sandbox_image
+
+        self.context = ContextBuilder(workspace, sandbox_image=self.sandbox_image)
         self.sessions = session_manager or SessionManager(workspace)
         self.tools = ToolRegistry()
         self.subagents = SubagentManager(
             provider=provider,
             workspace=workspace,
             bus=bus,
+            sandbox=self.sandbox,
             model=self.model,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             reasoning_effort=reasoning_effort,
             web_search_region=web_search_region,
             web_proxy=web_proxy,
-            exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
         )
 
@@ -118,16 +137,11 @@ class AgentLoop:
         allowed_dir = self.workspace if self.restrict_to_workspace else None
         for cls in (ReadFileTool, WriteFileTool, EditFileTool, ListDirTool):
             self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
-        self.tools.register(ExecTool(
-            working_dir=str(self.workspace),
-            timeout=self.exec_config.timeout,
-            restrict_to_workspace=self.restrict_to_workspace,
-            path_append=self.exec_config.path_append,
-            strip_env_vars=self.exec_config.strip_env_vars,
-        ))
+
+        self.tools.register(ExecTool(sandbox=self.sandbox))
         self.tools.register(WebSearchTool(region=self.web_search_region))
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
-        self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
+        self.tools.register(MessageTool(send_callback=self.bus.publish_outbound, workspace=self.workspace, allowed_dir=allowed_dir))
         self.tools.register(SpawnTool(manager=self.subagents))
         self.tools.register(ReadSkillTool(workspace=self.workspace))
         if self.cron_service:
