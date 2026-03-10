@@ -1,6 +1,6 @@
 """Configuration loading utilities."""
 
-import json
+import yaml
 from pathlib import Path
 
 from nanobot.config.schema import Config
@@ -20,7 +20,7 @@ def get_config_path() -> Path:
     """Get the configuration file path."""
     if _current_config_path:
         return _current_config_path
-    return Path.home() / ".nanobot" / "config.json"
+    return Path.home() / ".nanobot" / "config.yaml"
 
 
 def load_config(config_path: Path | None = None, interpolate_env_vars: bool = True) -> Config:
@@ -41,9 +41,9 @@ def load_config(config_path: Path | None = None, interpolate_env_vars: bool = Tr
                 config_str = f.read()
             if interpolate_env_vars:
                 config_str =  _interpolate_env_vars(config_str)
-            data = _migrate_config(json.loads(config_str))
+            data = _migrate_config(yaml.safe_load(config_str))
             return Config.model_validate(data)
-        except (json.JSONDecodeError, ValueError) as e:
+        except (yaml.YAMLError, ValueError) as e:
             print(f"Warning: Failed to load config from {path}: {e}")
             print("Using default configuration.")
 
@@ -64,7 +64,7 @@ def save_config(config: Config, config_path: Path | None = None) -> None:
     data = config.model_dump(by_alias=True)
 
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        yaml.safe_dump(data, f, indent=2, allow_unicode=False)
 
 
 def _migrate_config(data: dict) -> dict:

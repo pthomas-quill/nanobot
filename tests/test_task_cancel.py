@@ -131,11 +131,14 @@ class TestSubagentCancellation:
     async def test_cancel_by_session(self):
         from nanobot.agent.subagent import SubagentManager
         from nanobot.bus.queue import MessageBus
+        from nanobot.sandbox import HostBox
 
         bus = MessageBus()
         provider = MagicMock()
         provider.get_default_model.return_value = "test-model"
-        mgr = SubagentManager(provider=provider, workspace=MagicMock(), bus=bus)
+        workspace = MagicMock()
+        sandbox = HostBox(workspace=workspace)
+        mgr = SubagentManager(provider=provider, workspace=workspace, bus=bus, sandbox=sandbox)
 
         cancelled = asyncio.Event()
 
@@ -159,9 +162,12 @@ class TestSubagentCancellation:
     async def test_cancel_by_session_no_tasks(self):
         from nanobot.agent.subagent import SubagentManager
         from nanobot.bus.queue import MessageBus
+        from nanobot.sandbox import HostBox
 
         bus = MessageBus()
         provider = MagicMock()
         provider.get_default_model.return_value = "test-model"
-        mgr = SubagentManager(provider=provider, workspace=MagicMock(), bus=bus)
+        workspace = MagicMock()
+        sandbox = HostBox(workspace=workspace)
+        mgr = SubagentManager(provider=provider, workspace=workspace, bus=bus, sandbox=sandbox)
         assert await mgr.cancel_by_session("nonexistent") == 0

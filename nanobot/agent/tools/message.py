@@ -1,10 +1,10 @@
 """Message tool for sending messages to users."""
 
 from typing import Any, Awaitable, Callable
+from pathlib import Path
 
 from nanobot.agent.tools.base import Tool
 from nanobot.bus.events import OutboundMessage
-from pathlib import Path
 from nanobot.agent.tools.filesystem import _resolve_path
 
 class MessageTool(Tool):
@@ -12,7 +12,7 @@ class MessageTool(Tool):
 
     def __init__(
         self,
-        workspace: Path,
+        workspace: Path | None = None,
         send_callback: Callable[[OutboundMessage], Awaitable[None]] | None = None,
         allowed_dir: Path | None = None,
         default_channel: str = "",

@@ -31,7 +31,7 @@ def mock_paths():
             shutil.rmtree(base_dir)
         base_dir.mkdir()
 
-        config_file = base_dir / "config.json"
+        config_file = base_dir / "config.yaml"
         workspace_dir = base_dir / "workspace"
 
         mock_cp.return_value = config_file
@@ -192,7 +192,7 @@ def test_agent_uses_default_config_when_no_workspace_or_config_flags(mock_agent_
 
 
 def test_agent_uses_explicit_config_path(mock_agent_runtime, tmp_path: Path):
-    config_path = tmp_path / "agent-config.json"
+    config_path = tmp_path / "agent-config.yaml"
     config_path.write_text("{}")
 
     result = runner.invoke(app, ["agent", "-m", "hello", "-c", str(config_path)])
@@ -202,7 +202,7 @@ def test_agent_uses_explicit_config_path(mock_agent_runtime, tmp_path: Path):
 
 
 def test_agent_config_sets_active_path(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance" / "config.json"
+    config_file = tmp_path / "instance" / "config.yaml"
     config_file.parent.mkdir(parents=True)
     config_file.write_text("{}")
 
@@ -251,7 +251,7 @@ def test_agent_overrides_workspace_path(mock_agent_runtime):
 
 
 def test_agent_workspace_override_wins_over_config_workspace(mock_agent_runtime, tmp_path: Path):
-    config_path = tmp_path / "agent-config.json"
+    config_path = tmp_path / "agent-config.yaml"
     config_path.write_text("{}")
     workspace_path = Path("/tmp/agent-workspace")
 
@@ -268,7 +268,7 @@ def test_agent_workspace_override_wins_over_config_workspace(mock_agent_runtime,
 
 
 def test_gateway_uses_workspace_from_config_by_default(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance" / "config.json"
+    config_file = tmp_path / "instance" / "config.yaml"
     config_file.parent.mkdir(parents=True)
     config_file.write_text("{}")
 
@@ -298,7 +298,7 @@ def test_gateway_uses_workspace_from_config_by_default(monkeypatch, tmp_path: Pa
 
 
 def test_gateway_workspace_option_overrides_config(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance" / "config.json"
+    config_file = tmp_path / "instance" / "config.yaml"
     config_file.parent.mkdir(parents=True)
     config_file.write_text("{}")
 
@@ -329,7 +329,7 @@ def test_gateway_workspace_option_overrides_config(monkeypatch, tmp_path: Path) 
 
 
 def test_gateway_uses_config_directory_for_cron_store(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance" / "config.json"
+    config_file = tmp_path / "instance" / "config.yaml"
     config_file.parent.mkdir(parents=True)
     config_file.write_text("{}")
 

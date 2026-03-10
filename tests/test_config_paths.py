@@ -14,7 +14,7 @@ from nanobot.config.paths import (
 
 
 def test_runtime_dirs_follow_config_path(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance-a" / "config.json"
+    config_file = tmp_path / "instance-a" / "config.yaml"
     monkeypatch.setattr("nanobot.config.paths.get_config_path", lambda: config_file)
 
     assert get_data_dir() == config_file.parent
@@ -24,7 +24,7 @@ def test_runtime_dirs_follow_config_path(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_media_dir_supports_channel_namespace(monkeypatch, tmp_path: Path) -> None:
-    config_file = tmp_path / "instance-b" / "config.json"
+    config_file = tmp_path / "instance-b" / "config.yaml"
     monkeypatch.setattr("nanobot.config.paths.get_config_path", lambda: config_file)
 
     assert get_media_dir() == config_file.parent / "media"

@@ -60,10 +60,10 @@ class WebSearchTool(Tool):
         "required": ["query"]
     }
 
-    def __init__(self, max_results: int = 5, region: str = "wt-wt"):
+    def __init__(self, max_results: int = 5, region: str | None = None):
         self.max_results = max_results
         self.engine = DDGS()
-        self.region = region.lower()  
+        self.region = (region or "wt-wt").lower()  
         if not self.validate_region(self.region):
             raise ValueError(f"Invalid default region format: '{self.region}'. Expected format is 'en-us', 'fr-fr', etc.")
     
