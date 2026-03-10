@@ -21,7 +21,7 @@ from nanobot.agent.tools.read_skill import ReadSkillTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.sandbox import HostBox, ContainerBox
-from nanobot.agent.tools.shell import ExecTool
+from nanobot.agent.tools.shell import ExecTool, PackageTool
 from nanobot.agent.tools.spawn import SpawnTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
@@ -139,6 +139,8 @@ class AgentLoop:
             self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
 
         self.tools.register(ExecTool(sandbox=self.sandbox))
+        if isinstance(self.sandbox, ContainerBox):
+            self.tools.register(PackageTool(sandbox=self.sandbox))
         self.tools.register(WebSearchTool(region=self.web_search_region))
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound, workspace=self.workspace, allowed_dir=allowed_dir))

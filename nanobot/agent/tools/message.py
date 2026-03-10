@@ -92,7 +92,7 @@ class MessageTool(Tool):
             if not p.exists() or not p.is_file():
                 errors.append(f"Media file not found: {path}")
                 continue
-            valid_paths.append(str(p.absolute()))
+            valid_paths.append(str(p))
         return valid_paths,errors
 
     async def execute(

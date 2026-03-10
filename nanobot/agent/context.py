@@ -62,8 +62,9 @@ Skills with available="false" need dependencies installed first - you can try in
             runtime = f"Container image: {self.sandbox_image}"
             platform_policy = """## Platform Policy (POSIX Container)
 - You are running on a POSIX-like container. Prefer UTF-8 and standard shell tools.
-- Use file tools when they are simpler or more reliable than shell commands.
+- Use tools when they are simpler or more reliable than shell commands.
 - Only files in the workspace are persistant. Treat the container as ephemeral and isolated from the host system.
+- use the manage_packages tool to modify the container image (install or remove persistent packages) or to check installed packages.
 """
         
         else:

@@ -19,7 +19,7 @@ class HostBox(Sandbox):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.workspace = Path(workspace).expanduser().resolve().absolute()
+        self.workspace = Path(workspace).expanduser().resolve()
         self.restrict_to_workspace = restrict_to_workspace
         self.allowed_dir = self.workspace if restrict_to_workspace else None
         self.path_append = path_append

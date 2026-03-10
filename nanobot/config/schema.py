@@ -307,7 +307,7 @@ class ExecToolConfig(Base):
     timeout: int = 60
     path_append: str = ""
     strip_env_vars: list[str] = Field(default_factory=list) 
-    sandbox_image: str = "python:3.13-slim"
+    sandbox_image: str = "nanobot_sandbox"
 
 
 class MCPServerConfig(Base):
