@@ -24,13 +24,14 @@ from nanobot.sandbox import HostBox, ContainerBox
 from nanobot.agent.tools.shell import ExecTool, PackageTool
 from nanobot.agent.tools.spawn import SpawnTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
+from nanobot.agent.tools.gog import GOGTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
 from nanobot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ChannelsConfig, ExecToolConfig
+    from nanobot.config.schema import ChannelsConfig, ExecToolConfig, GOGToolConfig
     from nanobot.cron.service import CronService
 
 
@@ -62,6 +63,7 @@ class AgentLoop:
         web_search_region: str | None = None,
         web_proxy: str | None = None,
         exec_config: ExecToolConfig | None = None,
+        gog_config: GOGToolConfig | None = None,
         cron_service: CronService | None = None,
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
@@ -83,6 +85,7 @@ class AgentLoop:
         self.web_proxy = web_proxy
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
+        self.gog_config = gog_config or GOGToolConfig()
 
         sandbox_type = self.exec_config.sandbox_type.lower()
         if sandbox_type == "host":
@@ -118,6 +121,7 @@ class AgentLoop:
             web_search_region=web_search_region,
             web_proxy=web_proxy,
             restrict_to_workspace=restrict_to_workspace,
+            gog_config=self.gog_config,
         )
 
         self._running = False
@@ -148,6 +152,12 @@ class AgentLoop:
         self.tools.register(ReadSkillTool(workspace=self.workspace))
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
+        if self.gog_config.enabled:
+            self.tools.register(GOGTool(
+                gog_command=self.gog_config.gog_command,
+                authorize_send=self.gog_config.authorize_send,
+                timeout=self.gog_config.timeout,
+            ))
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""

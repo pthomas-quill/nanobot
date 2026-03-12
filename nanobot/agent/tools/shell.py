@@ -45,31 +45,7 @@ class ExecTool(Tool):
     async def execute(self, command: str, working_dir: str | None = None, **kwargs: Any) -> str:
         try:
             result: ShellResult = await self.sandbox.execute(command, working_dir)
-
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
-            returncode = result.returncode
-
-            output_parts = []
-            
-            max_len = 10000
-            if stdout:
-                if len(stdout) > max_len:
-                    stdout = stdout[:max_len] + f"\n... (truncated, {len(stdout) - max_len} more chars)"
-                output_parts.append(stdout)
-            
-            max_len = 5000
-            if stderr:
-                if len(stdout) > max_len:
-                    stdout = stdout[:max_len] + f"\n... (truncated, {len(stdout) - max_len} more chars)"
-                output_parts.append(f"STDERR:\n{stderr}")
-            
-            if returncode != 0:
-                output_parts.append(f"\nExit code: {returncode}")
-            
-            result = "\n".join(output_parts) if output_parts else "(no output)"
-            
-            return result
+            return str(result)
             
         except Exception as e:
             return f"Error executing command: {str(e)}"

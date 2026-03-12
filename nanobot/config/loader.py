@@ -64,7 +64,7 @@ def save_config(config: Config, config_path: Path | None = None) -> None:
     data = config.model_dump(by_alias=True)
 
     with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(data, f, indent=2, allow_unicode=False)
+        yaml.safe_dump(data, f, indent=2, allow_unicode=False, sort_keys=False)
 
 
 def _migrate_config(data: dict) -> dict:

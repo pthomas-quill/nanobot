@@ -8,11 +8,14 @@ from typing import Any
 
 from loguru import logger
 
+from nanobot.config.schema import GOGToolConfig
+
 from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.agent.tools.read_skill import ReadSkillTool
+from nanobot.agent.tools.gog import GOGTool
 from nanobot.bus.events import InboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
@@ -35,6 +38,7 @@ class SubagentManager:
         web_search_region: str | None = None,
         web_proxy: str | None = None,
         restrict_to_workspace: bool = False,
+        gog_config: GOGToolConfig | None = None,
     ):
         self.provider = provider
         self.workspace = workspace
@@ -45,6 +49,7 @@ class SubagentManager:
         self.reasoning_effort = reasoning_effort
         self.web_search_region = web_search_region
         self.web_proxy = web_proxy
+        self.gog_config = gog_config or GOGToolConfig()
         self.sandbox = sandbox
         if self.sandbox.is_isolated():
             self.restrict_to_workspace = True
@@ -106,6 +111,12 @@ class SubagentManager:
             tools.register(ExecTool(self.sandbox))
             tools.register(WebSearchTool(region=self.web_search_region))
             tools.register(WebFetchTool(proxy=self.web_proxy))
+            if self.gog_config.enabled:
+                tools.register(GOGTool(
+                    gog_command=self.gog_config.gog_command,
+                    authorize_send=self.gog_config.authorize_send,
+                    timeout=self.gog_config.timeout,
+                ))
             tools.register(ReadSkillTool(workspace=self.workspace))
             
             system_prompt = self._build_subagent_prompt()
@@ -226,7 +237,7 @@ Stay focused on the assigned task. Your final response will be reported back to 
 
         skills_summary = SkillsLoader(self.workspace).build_skills_summary()
         if skills_summary:
-            parts.append(f"## Skills\n\nRead SKILL.md with read_file to use a skill.\n\n{skills_summary}")
+            parts.append(f"## Skills\n\nRead SKILL.md with read_skill to use a skill.\n\n{skills_summary}")
 
         return "\n\n".join(parts)
     

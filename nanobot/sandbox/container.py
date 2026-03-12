@@ -230,8 +230,8 @@ RUN echo 'export PATH="/home/linuxbrew/.linuxbrew/opt/node@24/bin:$PATH"' >> /ro
             )
 
         return ShellResult(
-            stdout=stdout.decode("utf-8", errors="replace"),
-            stderr=stderr.decode("utf-8", errors="replace"),
+            stdout=stdout,
+            stderr=stderr,
             returncode=process.returncode,
         )
 

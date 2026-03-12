@@ -5,11 +5,42 @@ from typing import Any
 
 class ShellResult:
     """Represents the result of executing a shell command in the sandbox."""
+    stdout: str
+    stderr: str
+    returncode: int
+    MAX_STDOUT:int = 10000
+    MAX_STDERR:int = 5000
     
-    def __init__(self, stdout: str, stderr: str, returncode: int=0):
-        self.stdout = stdout
-        self.stderr = stderr
+    def __init__(self, stdout: bytes | str, stderr: bytes | str, returncode: int=0, max_stdout: int = MAX_STDOUT, max_stderr: int = MAX_STDERR):
+        self.stdout = stdout.decode("utf-8", errors="replace").strip() if isinstance(stdout, bytes) else stdout.strip()
+        self.stderr = stderr.decode("utf-8", errors="replace").strip() if isinstance(stderr, bytes) else stderr.strip()
         self.returncode = returncode
+        self.MAX_STDOUT = max_stdout
+        self.MAX_STDERR = max_stderr
+
+    def to_string(self) -> str:
+        stdout = self.stdout
+        stderr = self.stderr
+        returncode = self.returncode
+        output_parts = []
+                
+        if stdout:
+            if len(stdout) > self.MAX_STDOUT:
+                stdout = stdout[:self.MAX_STDOUT] + f"\n... (truncated, {len(stdout) - self.MAX_STDOUT} more chars)"
+            output_parts.append(stdout)
+        
+        if stderr:
+            if len(stderr) > self.MAX_STDERR:
+                stderr = stderr[:self.MAX_STDERR] + f"\n... (truncated, {len(stderr) - self.MAX_STDERR} more chars)"
+            output_parts.append(f"STDERR:\n{stderr}")
+        
+        if returncode != 0:
+            output_parts.append(f"\nExit code: {returncode}")
+        
+        return "\n".join(output_parts) if output_parts else "(no output)"
+    
+    def __str__(self) -> str:
+        return self.to_string()
 
 class Sandbox(ABC):
     """Abstract base class for shell sandboxes."""

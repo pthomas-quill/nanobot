@@ -309,6 +309,13 @@ class ExecToolConfig(Base):
     strip_env_vars: list[str] = Field(default_factory=list) 
     sandbox_image: str = "nanobot_sandbox"
 
+class GOGToolConfig(Base):
+    """GOG tool configuration."""
+    enabled: bool = False
+    timeout: int = 60
+    gog_command: str = "gog"
+    authorize_send: bool = False  
+
 
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
@@ -329,6 +336,7 @@ class ToolsConfig(Base):
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     restrict_to_workspace: bool = True  # If true, restrict all tool access to workspace directory
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
+    gog: GOGToolConfig = Field(default_factory=GOGToolConfig)
 
 
 class Config(BaseSettings):

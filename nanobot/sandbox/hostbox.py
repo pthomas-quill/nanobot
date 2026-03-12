@@ -6,6 +6,7 @@ import re
 
 from nanobot.sandbox.base import Sandbox, ShellResult
 
+
 class HostBox(Sandbox):
     """Executes code directly on the host system."""
 
@@ -13,7 +14,7 @@ class HostBox(Sandbox):
         self,
         workspace: Path,
         *args,
-        restrict_to_workspace: bool = True,        
+        restrict_to_workspace: bool = True,
         path_append: str = "",
         strip_env_vars: list[str] | None = None,
         **kwargs,
@@ -24,17 +25,19 @@ class HostBox(Sandbox):
         self.allowed_dir = self.workspace if restrict_to_workspace else None
         self.path_append = path_append
         self.strip_env_vars = strip_env_vars or []
-    
+
     @staticmethod
     def _extract_absolute_paths(command: str) -> list[str]:
-        win_paths = re.findall(r"[A-Za-z]:\\[^\s\"'|><;]+", command)   # Windows: C:\...
-        posix_paths = re.findall(r"(?:^|[\s|>])(/[^\s\"'>]+)", command) # POSIX: /absolute only
+        win_paths = re.findall(r"[A-Za-z]:\\[^\s\"'|><;]+", command)  # Windows: C:\...
+        posix_paths = re.findall(
+            r"(?:^|[\s|>])(/[^\s\"'>]+)", command
+        )  # POSIX: /absolute only
         return win_paths + posix_paths
-    
-    def _guard_workspace(self, cmd:str) -> bool:
+
+    def _guard_workspace(self, cmd: str) -> bool:
         if "..\\" in cmd or "../" in cmd:
             return "Error: Command blocked by safety guard (path traversal detected)"
-        
+
         for raw in self._extract_absolute_paths(cmd):
             try:
                 p = Path(raw.strip()).resolve()
@@ -52,10 +55,18 @@ class HostBox(Sandbox):
             try:
                 cwd = self._resolve_path(working_dir, self.workspace, self.allowed_dir)
             except PermissionError:
-                return ShellResult(stdout="", stderr="Error: Command blocked by safety guard (working_dir outside workspace)", returncode=-1)
+                return ShellResult(
+                    stdout="",
+                    stderr="Error: Command blocked by safety guard (working_dir outside workspace)",
+                    returncode=-1,
+                )
             except Exception as e:
-                return ShellResult(stdout="", stderr=f"Error: Invalid working directory: {str(e)}", returncode=-1)
-            
+                return ShellResult(
+                    stdout="",
+                    stderr=f"Error: Invalid working directory: {str(e)}",
+                    returncode=-1,
+                )
+
         guard_error = self._guard_command(command)
         if guard_error:
             return ShellResult(stdout="", stderr=guard_error, returncode=-1)
@@ -97,11 +108,10 @@ class HostBox(Sandbox):
             )
 
         return ShellResult(
-            stdout=stdout.decode("utf-8", errors="replace"),
-            stderr=stderr.decode("utf-8", errors="replace"),
+            stdout=stdout,
+            stderr=stderr,
             returncode=process.returncode,
         )
 
-    
     def is_isolated(self) -> bool:
         return False

@@ -46,7 +46,7 @@ def _validate_url(url: str) -> tuple[bool, str]:
 
 
 class WebSearchTool(Tool):
-    """Search the web using Brave Search API."""
+    """Search the web using DDGS Search library."""
 
     name = "web_search"
     description = "Search the web. Returns titles, URLs, and snippets."
