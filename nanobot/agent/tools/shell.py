@@ -9,13 +9,17 @@ from typing import Any
 from nanobot.agent.tools.base import Tool
 from nanobot.sandbox.base import Sandbox, ShellResult
 from nanobot.sandbox.container import ContainerBox
+from nanobot.sandbox.hostbox import HostBox
 
 
 class ExecTool(Tool):
     """Tool to execute shell commands."""
 
-    def __init__(self, sandbox: Sandbox):
+    _MAX_TIMEOUT = 600  # Maximum allowed timeout in seconds (10 minutes)
+
+    def __init__(self, sandbox: Sandbox = HostBox(), timeout: int = 60):
         self.sandbox = sandbox
+        self.timeout = timeout  # Default timeout for command execution in seconds
 
     @property
     def name(self) -> str:
@@ -32,19 +36,29 @@ class ExecTool(Tool):
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The shell command to execute"
+                    "description": "The shell command to execute",
                 },
                 "working_dir": {
                     "type": "string",
-                    "description": "Optional working directory for the command"
-                }
+                    "description": "Optional working directory for the command",
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": (
+                        "Timeout in seconds. Increase for long-running commands "
+                        f"like compilation or installation (default {self.timeout}, max {self._MAX_TIMEOUT})."
+                    ),
+                    "minimum": self.timeout,
+                    "maximum": self._MAX_TIMEOUT,
+                },
             },
-            "required": ["command"]
+            "required": ["command"],
         }
     
-    async def execute(self, command: str, working_dir: str | None = None, **kwargs: Any) -> str:
+    async def execute(self, command: str, working_dir: str | None = None, timeout: int | None = None, **kwargs: Any) -> str:
+        effective_timeout = min(timeout or self.timeout, self._MAX_TIMEOUT)
         try:
-            result: ShellResult = await self.sandbox.execute(command, working_dir)
+            result: ShellResult = await self.sandbox.execute(command, timeout=effective_timeout, working_dir=working_dir)
             return str(result)
             
         except Exception as e:

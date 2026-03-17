@@ -16,14 +16,12 @@ class ContainerBox(Sandbox):
 
     def __init__(
         self,
-        workspace: Path,
         *args,
         image: str = "nanobot_sandbox",
         backend: str = "podman",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.workspace = Path(workspace).expanduser().resolve()
         self.full_image_name = f"nanobot/{image.strip()}"
         self.backend = backend.lower()
         assert self.backend in (
@@ -194,7 +192,7 @@ RUN echo 'export PATH="/home/linuxbrew/.linuxbrew/opt/node@24/bin:$PATH"' >> /ro
         ]
 
     async def execute(
-        self, command: str, working_dir: str | None = None, **kwargs: Any
+        self, command: str, timeout: int, working_dir: str | None = None, **kwargs: Any
     ) -> str:
         if working_dir is None:
             cwd = self.workspace
@@ -213,7 +211,7 @@ RUN echo 'export PATH="/home/linuxbrew/.linuxbrew/opt/node@24/bin:$PATH"' >> /ro
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=self.timeout
+                process.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
             process.kill()
@@ -225,7 +223,7 @@ RUN echo 'export PATH="/home/linuxbrew/.linuxbrew/opt/node@24/bin:$PATH"' >> /ro
                 pass
             return ShellResult(
                 stdout="",
-                stderr=f"Error: Command timed out after {self.timeout} seconds",
+                stderr=f"Error: Command timed out after {timeout} seconds",
                 returncode=-1,
             )
 

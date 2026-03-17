@@ -12,7 +12,6 @@ class HostBox(Sandbox):
 
     def __init__(
         self,
-        workspace: Path,
         *args,
         restrict_to_workspace: bool = True,
         path_append: str = "",
@@ -20,7 +19,6 @@ class HostBox(Sandbox):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.workspace = Path(workspace).expanduser().resolve()
         self.restrict_to_workspace = restrict_to_workspace
         self.allowed_dir = self.workspace if restrict_to_workspace else None
         self.path_append = path_append
@@ -28,11 +26,10 @@ class HostBox(Sandbox):
 
     @staticmethod
     def _extract_absolute_paths(command: str) -> list[str]:
-        win_paths = re.findall(r"[A-Za-z]:\\[^\s\"'|><;]+", command)  # Windows: C:\...
-        posix_paths = re.findall(
-            r"(?:^|[\s|>])(/[^\s\"'>]+)", command
-        )  # POSIX: /absolute only
-        return win_paths + posix_paths
+        win_paths = re.findall(r"[A-Za-z]:\\[^\s\"'|><;]+", command)   # Windows: C:\...
+        posix_paths = re.findall(r"(?:^|[\s|>'\"])(/[^\s\"'>;|<]+)", command) # POSIX: /absolute only
+        home_paths = re.findall(r"(?:^|[\s|>'\"])(~[^\s\"'>;|<]*)", command) # POSIX/Windows home shortcut: ~
+        return win_paths + posix_paths + home_paths
 
     def _guard_workspace(self, cmd: str) -> bool:
         if "..\\" in cmd or "../" in cmd:
@@ -40,14 +37,15 @@ class HostBox(Sandbox):
 
         for raw in self._extract_absolute_paths(cmd):
             try:
-                p = Path(raw.strip()).resolve()
+                expanded = os.path.expandvars(raw.strip())
+                p = Path(expanded).expanduser().resolve()
             except Exception:
                 continue
-            if p.is_absolute() and not p.is_relative_to(self.workspace):
+            if p.is_absolute() and self.workspace not in p.parents and p != self.workspace:
                 return "Error: Command blocked by safety guard (path outside workspace)"
 
     async def execute(
-        self, command: str, working_dir: str | None = None, **kwargs: Any
+        self, command: str, timeout: int, working_dir: str | None = None, **kwargs: Any
     ) -> str:
         if working_dir is None:
             cwd = self.workspace
@@ -74,7 +72,7 @@ class HostBox(Sandbox):
             workspace_guard = self._guard_workspace(command)
             if workspace_guard:
                 return ShellResult(stdout="", stderr=workspace_guard, returncode=-1)
-
+        
         env = os.environ.copy()
         if self.path_append:
             env["PATH"] = env.get("PATH", "") + os.pathsep + self.path_append
@@ -91,7 +89,7 @@ class HostBox(Sandbox):
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=self.timeout
+                process.communicate(), timeout=timeout
             )
         except asyncio.TimeoutError:
             process.kill()
@@ -103,7 +101,7 @@ class HostBox(Sandbox):
                 pass
             return ShellResult(
                 stdout="",
-                stderr=f"Error: Command timed out after {self.timeout} seconds",
+                stderr=f"Error: Command timed out after {timeout} seconds",
                 returncode=-1,
             )
 

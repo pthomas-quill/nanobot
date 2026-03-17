@@ -8,15 +8,13 @@ class ShellResult:
     stdout: str
     stderr: str
     returncode: int
-    MAX_STDOUT:int = 10000
-    MAX_STDERR:int = 5000
+    _MAX_OUTPUT:int = 10_000
     
-    def __init__(self, stdout: bytes | str, stderr: bytes | str, returncode: int=0, max_stdout: int = MAX_STDOUT, max_stderr: int = MAX_STDERR):
+    def __init__(self, stdout: bytes | str, stderr: bytes | str, returncode: int=0, max_output: int = _MAX_OUTPUT):
         self.stdout = stdout.decode("utf-8", errors="replace").strip() if isinstance(stdout, bytes) else stdout.strip()
         self.stderr = stderr.decode("utf-8", errors="replace").strip() if isinstance(stderr, bytes) else stderr.strip()
         self.returncode = returncode
-        self.MAX_STDOUT = max_stdout
-        self.MAX_STDERR = max_stderr
+        self._MAX_STDOUT = max_output
 
     def to_string(self) -> str:
         stdout = self.stdout
@@ -25,19 +23,26 @@ class ShellResult:
         output_parts = []
                 
         if stdout:
-            if len(stdout) > self.MAX_STDOUT:
-                stdout = stdout[:self.MAX_STDOUT] + f"\n... (truncated, {len(stdout) - self.MAX_STDOUT} more chars)"
             output_parts.append(stdout)
         
         if stderr:
-            if len(stderr) > self.MAX_STDERR:
-                stderr = stderr[:self.MAX_STDERR] + f"\n... (truncated, {len(stderr) - self.MAX_STDERR} more chars)"
             output_parts.append(f"STDERR:\n{stderr}")
         
-        if returncode != 0:
-            output_parts.append(f"\nExit code: {returncode}")
+        output_parts.append(f"\nExit code: {returncode}")
         
-        return "\n".join(output_parts) if output_parts else "(no output)"
+        result = "\n".join(output_parts) if output_parts else "(no output)"
+
+        # Head + tail truncation to preserve both start and end of output
+        max_len = self._MAX_OUTPUT
+        if len(result) > max_len:
+            half = max_len // 2
+            result = (
+                result[:half]
+                + f"\n\n... ({len(result) - max_len:,} chars truncated) ...\n\n"
+                + result[-half:]
+            )
+        return result
+        
     
     def __str__(self) -> str:
         return self.to_string()
@@ -46,12 +51,12 @@ class Sandbox(ABC):
     """Abstract base class for shell sandboxes."""
 
     def __init__(self, 
-        timeout: int = 60,
+        workspace: Path | None = None,
         deny_patterns: list[str] | None = None,
         allow_patterns: list[str] | None = None,
         **kwargs,
     ):
-        self.timeout = timeout
+        self.workspace = Path(workspace or Path.cwd()).expanduser().resolve()
         self.deny_patterns = deny_patterns or [
             r"\brm\s+-[rf]{1,2}\b",          # rm -r, rm -rf, rm -fr
             r"\bdel\s+/[fq]\b",              # del /f, del /q
@@ -69,6 +74,10 @@ class Sandbox(ABC):
         """Best-effort safety guard for potentially destructive commands."""
         cmd = command.strip()
         lower = cmd.lower()
+
+        from nanobot.security.network import contains_internal_url
+        if contains_internal_url(cmd):
+            return "Error: Command blocked by safety guard (internal/private URL detected)"
 
         for pattern in self.deny_patterns:
             if re.search(pattern, lower):
@@ -98,7 +107,7 @@ class Sandbox(ABC):
 
 
     @abstractmethod
-    def execute(self, command: str, working_dir: str | None = None, **kwargs: Any) -> ShellResult:
+    def execute(self, command: str, timeout: int, working_dir: str | None = None, **kwargs: Any) -> ShellResult:
         """Execute a shell command in the sandbox.
         
         Args:
