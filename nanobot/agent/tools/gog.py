@@ -28,9 +28,9 @@ class GOGTool(Tool):
         if result.returncode != 0:
             raise RuntimeError(f"Failed to run '{self.gog_command} --version': {result.stderr.strip()}")
         logger.info(f"Initialized GOGTool: {result.stdout.strip()}")
-
+        self.timeout = timeout  
         self.authorize_send = authorize_send
-        self.sandbox = HostBox(workspace=".", restrict_to_workspace=False, timeout=timeout)
+        self.sandbox = HostBox(workspace=".", restrict_to_workspace=False)
     
     def _validate_arguments(self, arguments: str) -> tuple[bool, str]:
         """Validate the arguments for the gog command."""
@@ -55,7 +55,7 @@ class GOGTool(Tool):
             cmd = shlex.join([self.gog_command] + args)
             logger.info(f"Executing gog command: {cmd}")
 
-            result: ShellResult = await self.sandbox.execute(cmd)
+            result: ShellResult = await self.sandbox.execute(cmd,timeout=self.timeout)
 
             return str(result)
             
