@@ -42,8 +42,22 @@ class GOGTool(Tool):
             return None, "Admin commands are not allowed."
         if "logout" in args_lower or "login" in args_lower:
             return None, "Login/logout commands are not allowed."
+        if "--attendees" in args_lower or "--add-attendee" in args_lower:
+            return None, "Setting up attendees is not allowed."
+        if "--send-updates" in args_lower:
+            return None, "Sending calendar updates is not allowed."
         if not self.authorize_send and "send" in args_lower:
             return None, "Sending emails is not authorized."
+        if "subscribe" in args_lower or "sub" in args_lower or "add-calendar" in args_lower:
+            return None, "Subscribing to calendars is not allowed."
+        if "share" in args_lower or "unshare" in args_lower:
+            return None, "Sharing resources is not allowed."
+        if "chat" in args_lower:
+            return None, "Interacting with Google Chat is not allowed."
+        if "classroom" in args_lower or "class" in args_lower:
+            return None, "Interacting with Google Classroom is not allowed."
+        if "appscript" in args_lower or "script" in args_lower or "apps-script" in args_lower:
+            return None, "Interacting with Google Apps Script is not allowed."
         return args, ""
         
     async def execute(self, arguments:str, **kwargs: Any) -> str:
