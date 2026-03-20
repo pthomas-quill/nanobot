@@ -125,7 +125,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
-                parts.append(f"## {filename}\n\n{content}")
+                parts.append(f"## {file_path}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
 
@@ -139,20 +139,21 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         chat_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
-        runtime_ctx = self._build_runtime_context(channel, chat_id)
-        user_content = self._build_user_content(current_message, media)
+        # runtime_ctx = self._build_runtime_context(channel, chat_id)
+        datetime_ctx = f'[{current_time_str(include_day=False)}] '
+        user_content = self._build_user_content(f'{datetime_ctx}{current_message}', media)
 
         # Merge runtime context and user content into a single user message
         # to avoid consecutive same-role messages that some providers reject.
-        if isinstance(user_content, str):
-            merged = f"{runtime_ctx}\n\n{user_content}"
-        else:
-            merged = [{"type": "text", "text": runtime_ctx}] + user_content
+        # if isinstance(user_content, str):
+        #     merged = f"{runtime_ctx}\n\n{user_content}"
+        # else:
+        #     merged = [{"type": "text", "text": runtime_ctx}] + user_content
 
         return [
             {"role": "system", "content": self.build_system_prompt(skill_names)},
             *history,
-            {"role": "user", "content": merged},
+            {"role": "user", "content": user_content},
         ]
 
     def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
