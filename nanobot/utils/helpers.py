@@ -34,9 +34,12 @@ def timestamp() -> str:
     return datetime.now().isoformat()
 
 
-def current_time_str() -> str:
+def current_time_str(include_day=True) -> str:
     """Human-readable current time with weekday and timezone, e.g. '2026-03-15 22:30 (Saturday) (CST)'."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
+    date_format = "%Y-%m-%d %H:%M"
+    if include_day:
+        date_format += " (%A)"
+    now = datetime.now().strftime(date_format)
     tz = time.strftime("%Z") or "UTC"
     return f"{now} ({tz})"
 
