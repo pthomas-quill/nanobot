@@ -3,9 +3,13 @@
 import difflib
 from pathlib import Path
 from typing import Any
+import hashlib
 
 from nanobot.agent.tools.base import Tool
 
+def _hash_line(line: str) -> str:
+    """Generate a short hash for a line of text."""
+    return hashlib.sha1(line.encode("utf-8")).hexdigest()[:3]
 
 def _resolve_path(
     path: str,
@@ -67,8 +71,9 @@ class ReadFileTool(_FsTool):
     @property
     def description(self) -> str:
         return (
-            "Read the contents of a file. Returns numbered lines. "
+            "Read the contents of a file. Returns numbered:hashed lines. "
             "Use offset and limit to paginate through large files."
+            "Each line is prefixed with its line number and a hash of the content for reference in edits."
         )
 
     @property
@@ -111,7 +116,7 @@ class ReadFileTool(_FsTool):
 
             start = offset - 1
             end = min(start + (limit or self._DEFAULT_LIMIT), total)
-            numbered = [f"{start + i + 1}| {line}" for i, line in enumerate(all_lines[start:end])]
+            numbered = [f"{start + i + 1}:{_hash_line(line)}| {line}" for i, line in enumerate(all_lines[start:end])]
             result = "\n".join(numbered)
 
             if len(result) > self._MAX_CHARS:
@@ -290,6 +295,113 @@ class EditFileTool(_FsTool):
             return f"Error: old_text not found in {path}.\nBest match ({best_ratio:.0%} similar) at line {best_start + 1}:\n{diff}"
         return f"Error: old_text not found in {path}. No similar text found. Verify the file content."
 
+# ---------------------------------------------------------------------------
+# line_edit
+# ---------------------------------------------------------------------------
+
+class LineEditTool(_FsTool):
+    """Edit a file by replacing a line or inserting after of before a line number."""
+
+    @property
+    def name(self) -> str:
+        return "line_edit"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Edit a file by replacing a line or inserting after of before a specific line."
+            "Lines are identified by their line number and a hash of their content to ensure correct matching (e.g. 42:1a2)."
+            "If line_id_end is provided, the edit will replace all lines from line_id to line_id_end (inclusive)."
+            "This tool should be prefered over edit_file when possible."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "The file path to edit"},
+                "line_id": {"type": "string", "description": "The line id (number:hash) to edit."},
+                "content": {
+                    "type": "string",
+                    "description": "The text to write in the line edit.",
+                },
+                "action": {
+                    "type": "string", 
+                    "enum": ["replace","delete", "insert_after", "insert_before"],
+                    "description": "The edit action to perform: replace the line, delete the line, insert a new line after or before the specified line. (default: replace)"
+                },
+                "line_id_end": {
+                    "type": "string",
+                    "description": "Optional end line id (number:hash) for range edits. If provided, the edit will replace or delete all lines from line_id to line_id_end (inclusive).",
+                },
+                
+            },
+            "required": ["path", "line_id","content"],
+        }
+
+    async def execute(
+        self, path: str, line_id: str, content: str, action: str | None = None, line_id_end: str | None = None,
+         **kwargs: Any,
+    ) -> str:
+        try:
+            fp = self._resolve(path)
+            if not fp.exists():
+                return f"Error: File not found: {path}"
+
+            lines = fp.read_text(encoding="utf-8").splitlines()
+            total = len(lines)
+
+            line_number, line_hash = line_id.split(":", 1)
+            line_number = int(line_number)
+            idx = line_number - 1 if line_number > 0 else total + line_number
+
+            if idx < 0 or idx >= total:
+                return f"Error: line number {line_number} is out of range for file with {total} lines"
+            
+            true_hash = _hash_line(lines[idx])
+            if true_hash != line_hash:
+                return f"Error: line hash mismatch at line {line_number}. Expected {line_hash}, but actual hash is {true_hash}. Verify the file content and line_id."
+            
+            if action is None:
+                action = "replace"
+
+            if line_id_end is not None:
+                line_number_end, line_hash_end = line_id_end.split(":", 1)
+                line_number_end = int(line_number_end)
+                if action not in  ("replace", "delete"):
+                    return f"Error: line_id_end can only be used with 'replace' or 'delete' actions"
+                end_idx = line_number_end - 1 if line_number_end > 0 else total + line_number_end
+                if end_idx < idx or end_idx >= total:
+                    return f"Error: line number {line_number_end} is out of range or before line_number for file with {total} lines"
+                true_hash_end = _hash_line(lines[end_idx])
+                if true_hash_end != line_hash_end:
+                    return f"Error: line hash mismatch at line {line_number_end}. Expected {line_hash_end}, but actual hash is {true_hash_end}. Verify the file content and line_id_end."
+                idx, end_idx = min(idx, end_idx), max(idx, end_idx)
+                if action == "delete":
+                    del lines[idx : end_idx + 1]
+                elif action == "replace":
+                    lines[idx] = content
+                    del lines[idx + 1 : end_idx + 1]
+            
+            elif action == "replace":
+                lines[idx] = content
+            elif action == "delete":
+                del lines[idx]
+            elif action == "insert_after":
+                lines.insert(idx + 1, content)
+            elif action == "insert_before":
+                lines.insert(idx, content)
+            else:
+                return f"Error: Invalid action {action}. Must be one of replace, delete, insert_after, insert_before."
+
+            fp.write_text("\n".join(lines), encoding="utf-8")
+            return f"Successfully edited {fp}"
+        except PermissionError as e:
+            return f"Error: {e}"
+        except Exception as e:
+            return f"Error editing file: {e}"
+        
 
 # ---------------------------------------------------------------------------
 # list_dir

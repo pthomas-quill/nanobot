@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from loguru import logger
 
 from nanobot.agent.context import ContextBuilder
-from nanobot.agent.memory import MemoryConsolidator
+from nanobot.agent.memory_agent import MemoryAgent
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
+from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool, LineEditTool
 from nanobot.agent.tools.read_skill import ReadSkillTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
@@ -127,7 +127,7 @@ class AgentLoop:
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_key -> tasks
         self._background_tasks: list[asyncio.Task] = []
         self._processing_lock = asyncio.Lock()
-        self.memory_consolidator = MemoryConsolidator(
+        self.memory_consolidator = MemoryAgent(
             workspace=workspace,
             provider=provider,
             model=self.model,
@@ -143,7 +143,7 @@ class AgentLoop:
         allowed_dir = self.workspace if self.restrict_to_workspace else None
         extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
         self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
-        for cls in (WriteFileTool, EditFileTool, ListDirTool):
+        for cls in (WriteFileTool,LineEditTool, EditFileTool,ListDirTool):
             self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
         self.tools.register(ExecTool(sandbox=self.sandbox, timeout=self.exec_config.timeout))
         if isinstance(self.sandbox, ContainerBox):
