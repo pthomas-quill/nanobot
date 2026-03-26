@@ -1,11 +1,13 @@
 """File system tools: read, write, edit, list."""
 
 import difflib
+import mimetypes
 from pathlib import Path
 from typing import Any
 import hashlib
 
 from nanobot.agent.tools.base import Tool
+from nanobot.utils.helpers import build_image_content_blocks, detect_image_mime
 
 def _hash_line(line: str) -> str:
     """Generate a short hash for a line of text."""
@@ -96,27 +98,40 @@ class ReadFileTool(_FsTool):
             "required": ["path"],
         }
 
-    async def execute(self, path: str, offset: int = 1, limit: int | None = None, **kwargs: Any) -> str:
+    async def execute(self, path: str | None = None, offset: int = 1, limit: int | None = None, **kwargs: Any) -> Any:
         try:
+            if not path:
+                return "Error reading file: Unknown path"
             fp = self._resolve(path)
             if not fp.exists():
                 return f"Error: File not found: {path}"
             if not fp.is_file():
                 return f"Error: Not a file: {path}"
 
-            all_lines = fp.read_text(encoding="utf-8").splitlines()
+            raw = fp.read_bytes()
+            if not raw:
+                return f"(Empty file: {path})"
+
+            mime = detect_image_mime(raw) or mimetypes.guess_type(path)[0]
+            if mime and mime.startswith("image/"):
+                return build_image_content_blocks(raw, mime, str(fp), f"(Image file: {path})")
+
+            try:
+                text_content = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return f"Error: Cannot read binary file {path} (MIME: {mime or 'unknown'}). Only UTF-8 text and images are supported."
+
+            all_lines = text_content.splitlines()
             total = len(all_lines)
 
             if offset < 1:
                 offset = 1
-            if total == 0:
-                return f"(Empty file: {path})"
             if offset > total:
                 return f"Error: offset {offset} is beyond end of file ({total} lines)"
 
             start = offset - 1
             end = min(start + (limit or self._DEFAULT_LIMIT), total)
-            numbered = [f"{start + i + 1}:{_hash_line(line)}| {line}" for i, line in enumerate(all_lines[start:end])]
+            numbered = [f"{start + i + 1}#{_hash_line(line)}| {line}" for i, line in enumerate(all_lines[start:end])]
             result = "\n".join(numbered)
 
             if len(result) > self._MAX_CHARS:
@@ -166,8 +181,12 @@ class WriteFileTool(_FsTool):
             "required": ["path", "content"],
         }
 
-    async def execute(self, path: str, content: str, **kwargs: Any) -> str:
+    async def execute(self, path: str | None = None, content: str | None = None, **kwargs: Any) -> str:
         try:
+            if not path:
+                raise ValueError("Unknown path")
+            if content is None:
+                raise ValueError("Unknown content")
             fp = self._resolve(path)
             fp.parent.mkdir(parents=True, exist_ok=True)
             fp.write_text(content, encoding="utf-8")
@@ -240,10 +259,18 @@ class EditFileTool(_FsTool):
         }
 
     async def execute(
-        self, path: str, old_text: str, new_text: str,
+        self, path: str | None = None, old_text: str | None = None,
+        new_text: str | None = None,
         replace_all: bool = False, **kwargs: Any,
     ) -> str:
         try:
+            if not path:
+                raise ValueError("Unknown path")
+            if old_text is None:
+                raise ValueError("Unknown old_text")
+            if new_text is None:
+                raise ValueError("Unknown new_text")
+
             fp = self._resolve(path)
             if not fp.exists():
                 return f"Error: File not found: {path}"
@@ -310,7 +337,7 @@ class LineEditTool(_FsTool):
     def description(self) -> str:
         return (
             "Edit a file by replacing a line or inserting after of before a specific line."
-            "Lines are identified by their line number and a hash of their content to ensure correct matching (e.g. 42:1a2)."
+            "Lines are identified by their line number and a hash of their content to ensure correct matching (e.g. 42#1a2)."
             "If line_id_end is provided, the edit will replace all lines from line_id to line_id_end (inclusive)."
             "This tool should be prefered over edit_file when possible."
         )
@@ -321,7 +348,7 @@ class LineEditTool(_FsTool):
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "The file path to edit"},
-                "line_id": {"type": "string", "description": "The line id (number:hash) to edit."},
+                "line_id": {"type": "string", "description": "The line id (number#hash) to edit."},
                 "content": {
                     "type": "string",
                     "description": "The text to write in the line edit.",
@@ -333,7 +360,7 @@ class LineEditTool(_FsTool):
                 },
                 "line_id_end": {
                     "type": "string",
-                    "description": "Optional end line id (number:hash) for range edits. If provided, the edit will replace or delete all lines from line_id to line_id_end (inclusive).",
+                    "description": "Optional end line id (number#hash) for range edits. If provided, the edit will replace or delete all lines from line_id to line_id_end (inclusive).",
                 },
                 
             },
@@ -449,10 +476,12 @@ class ListDirTool(_FsTool):
         }
 
     async def execute(
-        self, path: str, recursive: bool = False,
+        self, path: str | None = None, recursive: bool = False,
         max_entries: int | None = None, **kwargs: Any,
     ) -> str:
         try:
+            if path is None:
+                raise ValueError("Unknown path")
             dp = self._resolve(path)
             if not dp.exists():
                 return f"Error: Directory not found: {path}"

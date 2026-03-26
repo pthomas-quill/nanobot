@@ -3,8 +3,11 @@
 import asyncio
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 from nanobot.sandbox.base import Sandbox, ShellResult

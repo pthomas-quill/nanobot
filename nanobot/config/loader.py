@@ -3,8 +3,10 @@
 import yaml
 from pathlib import Path
 
-from nanobot.config.schema import Config
+import pydantic
+from loguru import logger
 
+from nanobot.config.schema import Config
 
 # Global variable to store current config path (for multi-instance support)
 _current_config_path: Path | None = None
@@ -44,8 +46,8 @@ def load_config(config_path: Path | None = None, interpolate_env_vars: bool = Tr
             data = _migrate_config(yaml.safe_load(config_str))
             return Config.model_validate(data)
         except (yaml.YAMLError, ValueError) as e:
-            print(f"Warning: Failed to load config from {path}: {e}")
-            print("Using default configuration.")
+            logger.warning(f"Failed to load config from {path}: {e}")
+            logger.warning("Using default configuration.")
 
     return Config()
 
@@ -61,7 +63,7 @@ def save_config(config: Config, config_path: Path | None = None) -> None:
     path = config_path or get_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = config.model_dump(by_alias=True)
+    data = config.model_dump(mode="json", by_alias=True)
 
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, indent=2, allow_unicode=False, sort_keys=False)

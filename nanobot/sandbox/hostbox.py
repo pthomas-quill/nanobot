@@ -3,6 +3,10 @@ import os
 from typing import Any
 from pathlib import Path
 import re
+import sys
+
+from loguru import logger
+
 
 from nanobot.sandbox.base import Sandbox, ShellResult
 
@@ -99,6 +103,12 @@ class HostBox(Sandbox):
                 await asyncio.wait_for(process.wait(), timeout=5.0)
             except asyncio.TimeoutError:
                 pass
+            finally:
+                if sys.platform != "win32":
+                    try:
+                        os.waitpid(process.pid, os.WNOHANG)
+                    except (ProcessLookupError, ChildProcessError) as e:
+                        logger.debug("Process already reaped or not found: {}", e)
             return ShellResult(
                 stdout="",
                 stderr=f"Error: Command timed out after {timeout} seconds",
